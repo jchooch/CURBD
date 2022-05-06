@@ -36,7 +36,7 @@ model = curbd.trainMultiRegionRNN(activity,
                                   dtFactor=5,
                                   regions=regions,
                                   tauRNN=2*sim['params']['tau']/2,
-                                  nRunTrain=500,
+                                  nRunTrain=100, ######### RUNS #########
                                   verbose=True,
                                   nRunFree=5)
 

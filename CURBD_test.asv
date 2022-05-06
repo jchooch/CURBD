@@ -1,0 +1,69 @@
+% CURBD_test.m
+
+clear all;
+close all;
+clc;
+
+load('curbd_example_workspace.mat');
+
+load('/Users/joechoo-choy/Documents/github_jchooch/zfish_pretectum_rnn/matlab/current/ensemble/output_1.mat');
+
+
+% Should use CURBD in the following mode: 
+% out = computeCURBD(RNN, J, regions, params)
+
+RNN = R;
+J = ;
+
+A_neuron_indices = 1:N/3;
+B_neuron_indices = (N/3)+1:N-(N/3);
+C_neuron_indices = N-(N/3)+1:N;
+
+test_regions = {'Selectivity A', A_neuron_indices; 'Selectivity B', B_neuron_indices; 'Selectivity C', C_neuron_indices};
+test_params = model.params;
+
+CURBD_output = computeCURBD(test_RNN, test_J, test_regions, test_params);
+
+%{
+sim = threeRegionSim(struct('N',100));
+
+activity = cat(1,sim.Ra,sim.Rb,sim.Rc);
+regions = { ...
+    'Region A',1:sim.params.Na; ...
+    'Region B',sim.params.Na+1:sim.params.Na+sim.params.Nb; ...
+    'Region C',sim.params.Na+sim.params.Nb+1:sim.params.Na+sim.params.Nb+sim.params.Nc; ...
+    };
+
+
+% train Model RNN targeting these three regions
+model = trainMultiRegionRNN(activity, struct( ...
+    'dtData',sim.params.dtData, ...
+    'dtFactor',5, ...
+    'regionNames',{regions(:,1)}, ...
+    'regionIDs',{regions(:,2)}, ...
+    'tauRNN',sim.params.tau/2, ...
+    'nRunTrain',100, ...
+    'nRunFree',5));
+
+
+%CURBD = computeCURBD(model);
+% NEED SELECTIVITIES
+% NEED PARAMS
+% CURBD = computeCURBD(R, J, regions, params);
+
+% plot heatmaps of currents
+figure('Position',[100 100 900 900]);
+count = 1;
+for iTarget = 1:size(CURBD,1)
+    for iSource = 1:size(CURBD,2)
+        subplot(size(CURBD,1),size(CURBD,2),count); hold all; count = count + 1;
+        imagesc(model.tRNN,1:sim.params.Na,CURBD{iTarget,iSource});
+        axis tight;
+        set(gca,'Box','off','TickDir','out','FontSIze',14,'CLim',[-1 1]);
+        xlabel('Time (s)');
+        ylabel(['Neurons in ' regions{iTarget,1}]);
+        title([regions{iSource,1} ' to ' regions{iTarget,1}]);
+    end
+end
+colormap winter;
+%}
