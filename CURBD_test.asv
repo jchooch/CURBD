@@ -1,9 +1,13 @@
 % CURBD_test.m
+% CREATE A SUBDIRECTORY IN THE CURRENT WORKING DIRECTORY: /CURBD_figures/
+% THIS SCRIPT GENERATES FIGURES, WHICH WILL BE SAVED TO /CURBD_figures/.
+
 
 clear all;
 close all;
 clc;
 
+%% DEFINE SELECTIVITIES
 Forward_indices = [1:37];
 Backward_indices = [203:249];
 Right_lateral_indices = [55:76];
@@ -26,10 +30,14 @@ Binocular_indices = sort(Binocular_indices);
 number_of_neurons = length(Monocular_indices) + length(Binocular_indices);
 
 % Should use CURBD in the following mode: out = computeCURBD(RNN, J, regions, params)
+%
+correlation_table = [];
 
-for ensemble_index = 1:100
+for ensemble_index = 1:5
     load(sprintf('~/Documents/github_jchooch/zfish_pretectum_rnn/matlab/current/ensemble/output_%d.mat', ensemble_index));
-    test_RNN = R;
+    fprintf('Ensemble index: %d \n Data file: output_%d.mat \n', ensemble_index, ensemble_index);
+
+    test_RNN = R(:, 1:end-2);
     test_J = J;
     test_N = N;
     
@@ -46,15 +54,7 @@ for ensemble_index = 1:100
     plot_index = reshape(1:size(test_CURBD,1) * (size(test_CURBD,2)+1), size(test_CURBD,1), size(test_CURBD,2)+1).';
     count = 1;
     
-    activities_norm = norm(test_RNN);
     average_correlations = [];
-    CURBD_norm = 0;
-    for iTarget = 1:size(test_CURBD,1)
-        for iSource = 1:size(test_CURBD,2)
-            CURBD_norm = CURBD_norm + norm(test_CURBD{iTarget, iSource});
-        end
-    end
-    CURBD_norm = CURBD_norm / (size(test_CURBD,1)*size(test_CURBD,2));
     
     for iTarget = 1:size(test_CURBD,1)
         
@@ -82,19 +82,17 @@ for ensemble_index = 1:100
             ylabel(['Neurons in ' test_regions{iTarget,1}]);
             title([test_regions{iSource,1} ' to ' test_regions{iTarget,1}]);
             summed_correlations = 0;
-            for neuron = 1:size(test_CURBD{iTarget,iSource}, 1)
-                summed_correlations = summed_correlations + corrcoef(test_CURBD{iTarget, iSource}(neuron, :), target_activities(neuron, :));
+            for neuron = 1:length(test_regions{iTarget, 2})
+                summed_correlations = summed_correlations + corr2(test_CURBD{iTarget, iSource}(neuron, :), target_activities(neuron, :));
             end
             average_correlation = summed_correlations / size(test_CURBD{iTarget,iSource}, 1);
-            sprintf('Average correlation for target %d voltage and source %d current: %d', iTarget)
+            fprintf('Average correlation between target %d and source %d: %d \n', iTarget, iSource, average_correlation);
+            average_correlations = [average_correlations; average_correlation];
         end
-        
-        average_correlations = [average_correlations; average_correlation];
     end
     colormap redblue(100);
-    mean_activity_current_correlation = mean(activity_current_correlations);
-    mean_activity_current_correlations = [mean_activity_current_correlations; mean_activity_current_correlation];
-    saveas(gcf, sprintf('CURBD_fig_%d.png', ensemble_index));
+    saveas(gcf, sprintf('/CURBD_figures/CURBD_fig_%d.png', ensemble_index));
+    display(average_correlations);
+    correlation_table = [correlation_table; ensemble_index, reshape(average_correlations', 1, numel(average_correlations))];
 end
-display(average_correlations);
-display(mean(mean_activity_current_correlations))
+display(correlation_table)
