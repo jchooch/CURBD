@@ -4,66 +4,97 @@ clear all;
 close all;
 clc;
 
-load('curbd_example_workspace.mat');
+Forward_indices = [1:37];
+Backward_indices = [203:249];
+Right_lateral_indices = [55:76];
+Right_medial_indices = [119:130, 133:138, 142:143, 145:147, 149, 151:165];
+Right_binocular_indices = [78:86, 166:185];
+Left_lateral_indices = [351:402];
+Left_medial_indices = [269:318];
+Left_binocular_indices = [344:348, 408:410];
+Outward_indices = [103:109, 407, 409];
+Inward_indices = [196:199, 319:323];
 
-load('/Users/joechoo-choy/Documents/github_jchooch/zfish_pretectum_rnn/matlab/current/ensemble/output_1.mat');
+Monocular_indices = [Right_lateral_indices, Right_medial_indices, Left_lateral_indices, Left_medial_indices];
+Monocular_indices = unique(Monocular_indices, 'stable');
+Monocular_indices = sort(Monocular_indices);
 
+Binocular_indices = [Right_binocular_indices, Left_binocular_indices, Outward_indices, Inward_indices];
+Binocular_indices = unique(Binocular_indices, 'stable');
+Binocular_indices = sort(Binocular_indices);
 
-% Should use CURBD in the following mode: 
-% out = computeCURBD(RNN, J, regions, params)
+number_of_neurons = length(Monocular_indices) + length(Binocular_indices);
 
-RNN = R;
-J = ;
+% Should use CURBD in the following mode: out = computeCURBD(RNN, J, regions, params)
 
-A_neuron_indices = 1:N/3;
-B_neuron_indices = (N/3)+1:N-(N/3);
-C_neuron_indices = N-(N/3)+1:N;
-
-test_regions = {'Selectivity A', A_neuron_indices; 'Selectivity B', B_neuron_indices; 'Selectivity C', C_neuron_indices};
-test_params = model.params;
-
-CURBD_output = computeCURBD(test_RNN, test_J, test_regions, test_params);
-
-%{
-sim = threeRegionSim(struct('N',100));
-
-activity = cat(1,sim.Ra,sim.Rb,sim.Rc);
-regions = { ...
-    'Region A',1:sim.params.Na; ...
-    'Region B',sim.params.Na+1:sim.params.Na+sim.params.Nb; ...
-    'Region C',sim.params.Na+sim.params.Nb+1:sim.params.Na+sim.params.Nb+sim.params.Nc; ...
-    };
-
-
-% train Model RNN targeting these three regions
-model = trainMultiRegionRNN(activity, struct( ...
-    'dtData',sim.params.dtData, ...
-    'dtFactor',5, ...
-    'regionNames',{regions(:,1)}, ...
-    'regionIDs',{regions(:,2)}, ...
-    'tauRNN',sim.params.tau/2, ...
-    'nRunTrain',100, ...
-    'nRunFree',5));
-
-
-%CURBD = computeCURBD(model);
-% NEED SELECTIVITIES
-% NEED PARAMS
-% CURBD = computeCURBD(R, J, regions, params);
-
-% plot heatmaps of currents
-figure('Position',[100 100 900 900]);
-count = 1;
-for iTarget = 1:size(CURBD,1)
-    for iSource = 1:size(CURBD,2)
-        subplot(size(CURBD,1),size(CURBD,2),count); hold all; count = count + 1;
-        imagesc(model.tRNN,1:sim.params.Na,CURBD{iTarget,iSource});
+for ensemble_index = 1:100
+    load(sprintf('~/Documents/github_jchooch/zfish_pretectum_rnn/matlab/current/ensemble/output_%d.mat', ensemble_index));
+    test_RNN = R;
+    test_J = J;
+    test_N = N;
+    
+    load('curbd_example_workspace.mat');
+    
+    test_regions = {'Monocular', Monocular_indices; 
+                    'Binocular', Binocular_indices};
+    test_params = model.params;
+    
+    test_CURBD = computeCURBD(test_RNN, test_J, test_regions, test_params);
+    
+    % plot heatmaps of currents
+    figure('Position',[100 100 900 900]);
+    plot_index = reshape(1:size(test_CURBD,1) * (size(test_CURBD,2)+1), size(test_CURBD,1), size(test_CURBD,2)+1).';
+    count = 1;
+    
+    activities_norm = norm(test_RNN);
+    average_correlations = [];
+    CURBD_norm = 0;
+    for iTarget = 1:size(test_CURBD,1)
+        for iSource = 1:size(test_CURBD,2)
+            CURBD_norm = CURBD_norm + norm(test_CURBD{iTarget, iSource});
+        end
+    end
+    CURBD_norm = CURBD_norm / (size(test_CURBD,1)*size(test_CURBD,2));
+    
+    for iTarget = 1:size(test_CURBD,1)
+        
+        target_activities = [];
+        for id = 1:length(test_regions{iTarget, 2})
+            target_activities = [target_activities; test_RNN(test_regions{iTarget, 2}(id), :)];
+        end
+        
+        subplot(size(test_CURBD,1)+1, size(test_CURBD,2), plot_index(count));
+        hold all;
+        count = count + 1;
+        imagesc(1:size(test_RNN, 2), 1:length(test_regions{iTarget, 2}), target_activities);
         axis tight;
         set(gca,'Box','off','TickDir','out','FontSIze',14,'CLim',[-1 1]);
-        xlabel('Time (s)');
-        ylabel(['Neurons in ' regions{iTarget,1}]);
-        title([regions{iSource,1} ' to ' regions{iTarget,1}]);
+        xlabel('Frames');
+        ylabel(['Neurons in ' test_regions{iTarget,1}]);
+        title(['Activity in ' test_regions{iTarget,1}]);
+    
+        for iSource = 1:size(test_CURBD,2)
+            subplot(size(test_CURBD,1)+1,size(test_CURBD,2), plot_index(count)); hold all; count = count + 1;
+            imagesc(1:size(test_RNN, 2), 1:length(test_regions{iTarget, 2}), test_CURBD{iTarget,iSource});
+            axis tight;
+            set(gca,'Box','off','TickDir','out','FontSIze',14,'CLim',[-1 1]);
+            xlabel('Frames');
+            ylabel(['Neurons in ' test_regions{iTarget,1}]);
+            title([test_regions{iSource,1} ' to ' test_regions{iTarget,1}]);
+            summed_correlations = 0;
+            for neuron = 1:size(test_CURBD{iTarget,iSource}, 1)
+                summed_correlations = summed_correlations + corrcoef(test_CURBD{iTarget, iSource}(neuron, :), target_activities(neuron, :));
+            end
+            average_correlation = summed_correlations / size(test_CURBD{iTarget,iSource}, 1);
+            sprintf('Average correlation for target %d voltage and source %d current: %d', iTarget)
+        end
+        
+        average_correlations = [average_correlations; average_correlation];
     end
+    colormap redblue(100);
+    mean_activity_current_correlation = mean(activity_current_correlations);
+    mean_activity_current_correlations = [mean_activity_current_correlations; mean_activity_current_correlation];
+    saveas(gcf, sprintf('CURBD_fig_%d.png', ensemble_index));
 end
-colormap winter;
-%}
+display(average_correlations);
+display(mean(mean_activity_current_correlations))
