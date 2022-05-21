@@ -39,7 +39,7 @@ for ensemble_index = 1:5
     test_params = model.params;
     test_CURBD = computeCURBD(test_RNN, test_J, test_regions, test_params);
     % plot heatmaps of currents
-    figure('Position',[100 100 900 900]);
+    current_figure = figure('Position', [100 100 900 900], 'Visible', 'off');
     plot_index = reshape(1:size(test_CURBD,1) * (size(test_CURBD,2)+1), size(test_CURBD,1), size(test_CURBD,2)+1).';
     count = 1;
     average_correlations = [];
@@ -75,8 +75,20 @@ for ensemble_index = 1:5
         end
     end
     colormap redblue(100);
-    saveas(gcf, sprintf('/CURBD_figures/CURBD_fig_%d.png', ensemble_index));
-    display(average_correlations);
+    saveas(current_figure, sprintf('CURBD_figures/CURBD_fig_%d.png', ensemble_index));
+    fprintf('Average correlations: %d \n', average_correlations);
     correlation_table = [correlation_table; ensemble_index, reshape(average_correlations', 1, numel(average_correlations))];
 end
 display(correlation_table)
+
+figure('Position', [100 100 900 900], 'Visible', 'on');
+subplot(1, 2, 1); 
+hold all; 
+swarmchart([1, 2], [correlation_table(:, 2), correlation_table(:, 3)]); 
+xlabel('source region'); 
+title('source correlations for target 1 (mono)'); 
+subplot(1, 2, 2); 
+hold all; 
+swarmchart([1, 2], [correlation_table(:, 4), correlation_table(:, 5)]); 
+xlabel('source region'); 
+title('source correlations for target 2 (bino)');
