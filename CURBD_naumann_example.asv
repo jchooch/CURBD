@@ -33,9 +33,10 @@ Left_binocular_indices = [Left_binocular_indices];
 Right_binocular_indices = [Right_binocular_indices];
 %}
 
-number_of_neurons = length(Left_monocular_indices) + length(Right_monocular_indices) + length(Left_binocular_indices) + length(Right_binocular_indices);
+number_of_neurons = length(Left_monocular_indices) + length(Right_monocular_indices) + 
+length(Left_binocular_indices) + length(Right_binocular_indices);
 
-% Using CURBD in the following mode: out = computeCURBD(RNN, J, regions, params)
+% Should use CURBD in the following mode: out = computeCURBD(RNN, J, regions, params)
 
 correlation_table = [];
 
@@ -51,7 +52,7 @@ for ensemble_index = 1:1
         'Left monocular', Left_monocular_indices; 
         'Right monocular', Right_monocular_indices; 
         'Left binocular', Left_binocular_indices;
-        'Right binocular', Right_binocular_indices};
+        'Right binocular', Right_binocular_indices}
     test_params = model.params;
     test_CURBD = computeCURBD(test_RNN, test_J, test_regions, test_params);
     % plot heatmaps of currents
@@ -96,7 +97,7 @@ for ensemble_index = 1:1
     correlation_table = [correlation_table; ensemble_index, reshape(average_correlations', 1, numel(average_correlations))];
 end
 display(correlation_table)
-%{
+
 figure('Position', [100 100 900 900], 'Visible', 'on');
 subplot(1, 2, 1); 
 hold all; 
@@ -108,4 +109,3 @@ hold all;
 swarmchart([1, 2], [correlation_table(:, 4), correlation_table(:, 5)]); 
 xlabel('source region'); 
 title('source correlations for target 2 (bino)');
-%}
