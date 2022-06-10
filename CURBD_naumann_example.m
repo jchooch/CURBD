@@ -120,6 +120,8 @@ h.YDisplayLabels = num2cell(region_names);
 % - stimulus right vs left vs off
 % - stimulus binocular vs monocular
 % - etc
+% MEASURE DEVIATIONS OF DYNAMICS BY MAHALANOBIS DISTANCE FROM SOME NULL
+% DISTRIBUTION (CAN DO THIS FOR VOLTAGES AND CURRENTS)
 % USE WHOLE FIELD MOTION / BINOCULAR MOTION
 
 [coeff,score,latent,tsquared,explained,mu] = pca(test_CURBD{1, 1}.');
