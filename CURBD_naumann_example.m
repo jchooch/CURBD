@@ -40,18 +40,18 @@ number_of_neurons = length(Left_monocular_indices) + length(Right_monocular_indi
 correlation_table = [];
 
 for ensemble_index = 1:1
-    load(sprintf('~/Documents/github_jchooch/zfish_pretectum_rnn/matlab/current/ensemble/output_%d.mat', ensemble_index));
-    fprintf('Ensemble index: %d \n Data file: output_%d.mat \n', ensemble_index, ensemble_index);
-    test_RNN = R(:, 1:end-2);
-    test_J = J;
-    test_N = N;
+    data{ensemble_index} = load(sprintf('~/Documents/github_jchooch/zfish_pretectum_rnn/matlab/current/ensemble/output_%d.mat', ensemble_index));
+    fprintf('Data index (from ensemble): %d \n Data file: output_%d.mat \n', ensemble_index, ensemble_index);
+    test_RNN = data{1, ensemble_index}.R(:, 1:end-2);
+    test_J = data{1, ensemble_index}.J;
+    test_N = data{1, ensemble_index}.N;
     load('curbd_example_workspace.mat');
     %test_regions = {'Monocular', Monocular_indices; 'Binocular', Binocular_indices};
     test_regions = {
-        'Left monocular', Left_monocular_indices; 
-        'Right monocular', Right_monocular_indices; 
-        'Left binocular', Left_binocular_indices;
-        'Right binocular', Right_binocular_indices};
+        'LM', Left_monocular_indices;
+        'RM', Right_monocular_indices;
+        'LB', Left_binocular_indices;
+        'RB', Right_binocular_indices};
     test_params = model.params;
     test_CURBD = computeCURBD(test_RNN, test_J, test_regions, test_params);
     % plot heatmaps of currents
@@ -92,10 +92,68 @@ for ensemble_index = 1:1
     end
     colormap redblue(100);
     saveas(current_figure, sprintf('CURBD_figures/CURBD_fig_%d.png', ensemble_index));
-    fprintf('Average correlations: %d \n', average_correlations);
-    correlation_table = [correlation_table; ensemble_index, reshape(average_correlations', 1, numel(average_correlations))];
+    disp('Average correlations:')
+    disp(average_correlations)
+    correlation_table = [correlation_table; reshape(average_correlations', 1, numel(average_correlations))];
+    %correlation_table = [correlation_table; ensemble_index, reshape(average_correlations', 1, numel(average_correlations))];
 end
 display(correlation_table)
+
+figure()
+%plot_curbd_correlations(correlation_table, test_CURBD)
+h = heatmap(reshape(correlation_table, [size(test_CURBD, 1), size(test_CURBD, 2)]));
+h.Title = 'Correlations Between Target Activities and Source-Target Currents';
+h.XLabel = 'Source Region';
+h.YLabel = 'Target Region';
+region_names = [];
+for i=1:size(test_regions, 1)
+    region_names = [region_names, string(test_regions{i,1})];
+end
+h.XDisplayLabels = num2cell(region_names);
+h.YDisplayLabels = num2cell(region_names);
+
+% want to create a pca cell with pca coeff matrices for all curbd matrices
+% want to create a reduced_activities for all curbd matrices (multiply
+% relevant curbd matrix by relevant pca coeff matrix)
+% create time vectors for: 
+% - stimulus on vs off
+% - stimulus right vs left vs off
+% - stimulus binocular vs monocular
+% - etc
+% USE WHOLE FIELD MOTION / BINOCULAR MOTION
+
+[coeff,score,latent,tsquared,explained,mu] = pca(test_CURBD{1, 1}.');
+
+figure()
+reduced_activities = test_CURBD{1, 1}.' * coeff;
+reduced_activities = reduced_activities.';
+time_col = linspace(0,2*pi,size(reduced_activities,2));
+x = reduced_activities(1,:);
+y = reduced_activities(2,:);
+
+plot3(reduced_activities(1,1:500), reduced_activities(2,1:500), reduced_activities(3,1:500))
+
+% color code line plot with stimuli or dots (e.g. L,R)
+%{
+x = 0:.05:2*pi;
+y = sin(x);
+z = zeros(size(x));
+col = z;  % This is the color, vary with x in this case.
+surface([x;x],[y;y],[z;z],[col;col],...
+        'facecol','no',...
+        'edgecol','interp',...
+        'linew',2);
+%}
+
+%{
+for iTarget = 1:size(test_CURBD,1)
+    for iSource = 1:size(test_CURBD,2)
+        CURBD_PCs = pca(test_CURBD{iTarget, iSource}.');
+        CURBD_PCs
+    end
+end
+%}
+
 %{
 figure('Position', [100 100 900 900], 'Visible', 'on');
 subplot(1, 2, 1); 
