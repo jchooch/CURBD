@@ -15,7 +15,6 @@ Left_binocular_indices = [344:348, 408:410];
 Outward_indices = [103:109, 407, 409];
 Inward_indices = [196:199, 319:323];
 
-%{
 % USE THESE INDICES FOR JUST SUBDIVIDING INTO MONOCULAR AND BINOCULAR
 Monocular_indices = [Right_lateral_indices, Right_medial_indices, Left_lateral_indices, Left_medial_indices];
 Monocular_indices = unique(Monocular_indices, 'stable');
@@ -23,17 +22,19 @@ Monocular_indices = sort(Monocular_indices);
 Binocular_indices = [Right_binocular_indices, Left_binocular_indices, Outward_indices, Inward_indices];
 Binocular_indices = unique(Binocular_indices, 'stable');
 Binocular_indices = sort(Binocular_indices);
-%}
+number_of_neurons = length(Monocular_indices) + length(Binocular_indices);
 
-%{ USE THESE INDICES FOR SUBDIVIDING LEFT MONO, RIGHT MONO, LEFT BINO,
-%RIGHT BINO
+% E.g. "left eye rightward motion", "right eye upward motion", ...
+input_names = ["LERM", "LEUM", "LELM", "LEDM", "RERM", "REUM", "RELM", "REDM"];
+
+%{
+% USE THESE INDICES FOR SUBDIVIDING LEFT MONO, RIGHT MONO, LEFT BINO, RIGHT BINO
 Left_monocular_indices = [Left_lateral_indices, Left_medial_indices];
 Right_monocular_indices = [Right_lateral_indices, Right_medial_indices];
 Left_binocular_indices = [Left_binocular_indices];
 Right_binocular_indices = [Right_binocular_indices];
-%}
-
 number_of_neurons = length(Left_monocular_indices) + length(Right_monocular_indices) + length(Left_binocular_indices) + length(Right_binocular_indices);
+%}
 
 % Using CURBD in the following mode: out = computeCURBD(RNN, J, regions, params)
 
@@ -46,12 +47,13 @@ for ensemble_index = 1:1
     test_J = data{1, ensemble_index}.J;
     test_N = data{1, ensemble_index}.N;
     load('curbd_example_workspace.mat');
-    %test_regions = {'Monocular', Monocular_indices; 'Binocular', Binocular_indices};
-    test_regions = {
-        'LM', Left_monocular_indices;
-        'RM', Right_monocular_indices;
-        'LB', Left_binocular_indices;
-        'RB', Right_binocular_indices};
+    
+    % CHOOSE RELEVANT REGIONS AS ABOVE
+    test_regions = {'Monocular', Monocular_indices; 'Binocular', Binocular_indices};
+    %{
+    test_regions = {'LM', Left_monocular_indices;'RM', Right_monocular_indices;
+        'LB', Left_binocular_indices; 'RB', Right_binocular_indices};
+    %}
     test_params = model.params;
     test_CURBD = computeCURBD(test_RNN, test_J, test_regions, test_params);
     % plot heatmaps of currents
@@ -112,19 +114,111 @@ end
 h.XDisplayLabels = num2cell(region_names);
 h.YDisplayLabels = num2cell(region_names);
 
-[coeff,score,latent,tsquared,explained,mu] = pca(test_CURBD{1, 1}.');
-reduced_activities = test_CURBD{1, 1}.' * coeff;
-reduced_activities = reduced_activities.';
-plot(reduced_activities(1,:), reduced_activities(2,:))
+% want to create a pca cell with pca coeff matrices for all curbd matrices
+% want to create a reduced_activities for all curbd matrices (multiply
+% relevant curbd matrix by relevant pca coeff matrix)
+% create time vectors for: 
+% - stimulus on vs off
+% - stimulus right vs left vs off
+% - stimulus binocular vs monocular
+% - etc
+% MEASURE DEVIATIONS OF DYNAMICS BY MAHALANOBIS DISTANCE FROM SOME NULL
+% DISTRIBUTION (CAN DO THIS FOR VOLTAGES AND CURRENTS)
+% USE WHOLE FIELD MOTION / BINOCULAR MOTION
 
+coeffs = cell(size(test_CURBD, 1), size(test_CURBD, 2));
+reduced_currents = cell(size(test_CURBD, 1), size(test_CURBD, 2));
+for iTarget = 1:size(test_CURBD, 1)
+    for iSource = 1:size(test_CURBD, 2)
+        coeffs{iTarget,iSource} = pca(test_CURBD{iTarget,iSource}.');
+        reduced_currents{iTarget,iSource} = (test_CURBD{iTarget,iSource}.' * coeffs{iTarget,iSource}).';
+    end
+end
+
+starttime = 1000;
+stoptime = 3000;
+
+load('inputs.mat');
+
+%stim_plot = 'bin';
+stim_plot = 'all';
+%stim_plot = 'off';
+
+current_figure = figure('Position', [100 100 900 900], 'Visible', 'on');
+plot_index = reshape(1:size(test_CURBD,1) * size(test_CURBD,2), size(test_CURBD,1), size(test_CURBD,2)).';
+count = 1;
+for iTarget = 1:size(test_CURBD, 1)
+    for iSource = 1:size(test_CURBD, 2)
+        x = reduced_currents{iTarget,iSource}(1,:);
+        y = reduced_currents{iTarget,iSource}(2,:);
+        z = reduced_currents{iTarget,iSource}(3,:);
+        if stim_plot == 'bin'
+            stim_state = cell(1, 1);
+            stim_state{1,1} = reduced_currents{iTarget,iSource}(1:3,:);
+            summed_stims = sum(inputs, 1);
+            for k=1:length(summed_stims)
+                if summed_stims(k) == 0
+                    stim_state{1,1}(:,k) = nan;
+                end
+            end
+        elseif stim_plot == 'all'
+            stim_state = cell(1, size(inputs, 1));
+            for channel = 1:size(inputs, 1)
+                stim_state{channel} = reduced_currents{iTarget,iSource}(1:3,:);
+                for timepoint = 1:size(inputs, 2)
+                    if inputs(channel, timepoint) == 0
+                        stim_state{channel}(1:3,timepoint) = nan;
+                    end
+                end
+            end
+        end
+        subplot(size(test_CURBD,1),size(test_CURBD,2), plot_index(count)); hold all; count = count + 1;
+        %plot3(x(starttime:stoptime), y(starttime:stoptime), z(starttime:stoptime), 'r', 'LineWidth', 1)
+        c = ceil(linspace(starttime, stoptime, stoptime-starttime+1));
+        colormap('gray')
+        patch([x(starttime:stoptime) nan], [y(starttime:stoptime) nan], [z(starttime:stoptime) nan], [c nan] , ...
+            'FaceColor','none','EdgeColor','interp', 'LineWidth', 2, 'DisplayName', 'Current');
+        title(['Current from ' test_regions{iSource,1} ' to ' test_regions{iTarget, 1}]);
+        xlabel('PC1'); ylabel('PC2'); zlabel('PC3');
+        cbar = colorbar;
+        cbar.Label.String = 'Time (s)';
+        view(3)
+        new8colors = {'#adff2f','#0343df','#ffd1df','#228b22','#95d0fc',...
+            '#f97306','#c20078', '#ffd700'};
+        colororder(new8colors)
+        if stim_plot == 'bin'
+            plot3(stim_state{1,1}(1,starttime:stoptime), stim_state{1,1}(2,starttime:stoptime), stim_state{1,1}(3,starttime:stoptime), ...
+                '.r', 'MarkerSize', 10, 'DisplayName', 'Stimulus on')
+        elseif stim_plot == 'all'
+            for channel = 1:size(inputs, 1)
+                plot3(stim_state{channel}(1, starttime:stoptime), stim_state{channel}(2, starttime:stoptime), ...
+                    stim_state{channel}(3, starttime:stoptime), '.', 'MarkerSize', 11, ...
+                    'DisplayName', append('Stimulus: ', input_names(channel)))
+            end
+        end
+        grid on
+        set(gca, 'GridColor', 'k', 'Color','[.9 .9 .9]')
+        hold off
+        axis tight;
+        lgnd = legend();
+        set(lgnd,'Color', 'none', 'Location', 'northeast', 'FontSize', 10);
+        set(gca,'Box','off','TickDir','out','FontSIze', 14);
+    end
+end
+     
+%time_col = linspace(0,2*pi,size(reduced_activities,2));
+
+% color code line plot with stimuli or dots (e.g. L,R)
+%{
 x = 0:.05:2*pi;
 y = sin(x);
 z = zeros(size(x));
-col = x;  % This is the color, vary with x in this case.
+col = z;  % This is the color, vary with x in this case.
 surface([x;x],[y;y],[z;z],[col;col],...
         'facecol','no',...
         'edgecol','interp',...
         'linew',2);
+%}
 
 %{
 for iTarget = 1:size(test_CURBD,1)
