@@ -15,28 +15,33 @@ Left_binocular_indices = [344:348, 408:410];
 Outward_indices = [103:109, 407, 409];
 Inward_indices = [196:199, 319:323];
 
-% USE THESE INDICES FOR JUST SUBDIVIDING INTO MONOCULAR AND BINOCULAR
-Monocular_indices = [Right_lateral_indices, Right_medial_indices, Left_lateral_indices, Left_medial_indices];
-Monocular_indices = unique(Monocular_indices, 'stable');
-Monocular_indices = sort(Monocular_indices);
-Binocular_indices = [Right_binocular_indices, Left_binocular_indices, Outward_indices, Inward_indices];
-Binocular_indices = unique(Binocular_indices, 'stable');
-Binocular_indices = sort(Binocular_indices);
-number_of_neurons = length(Monocular_indices) + length(Binocular_indices);
+%% SETTINGS
+mono_bino_regions = false;
+left_right_mono_bino_regions = not(mono_bino_regions);
+%%
 
-% E.g. "left eye rightward motion", "right eye upward motion", ...
+if mono_bino_regions
+    Monocular_indices = [Right_lateral_indices, Right_medial_indices, Left_lateral_indices, Left_medial_indices];
+    Monocular_indices = unique(Monocular_indices, 'stable');
+    Monocular_indices = sort(Monocular_indices);
+    Binocular_indices = [Right_binocular_indices, Left_binocular_indices, Outward_indices, Inward_indices];
+    Binocular_indices = unique(Binocular_indices, 'stable');
+    Binocular_indices = sort(Binocular_indices);
+    number_of_neurons = length(Monocular_indices) + length(Binocular_indices);
+    test_regions = {'Monocular', Monocular_indices; 'Binocular', Binocular_indices};
+elseif left_right_mono_bino_regions
+    Left_monocular_indices = [Left_lateral_indices, Left_medial_indices];
+    Right_monocular_indices = [Right_lateral_indices, Right_medial_indices];
+    Left_binocular_indices = [Left_binocular_indices];
+    Right_binocular_indices = [Right_binocular_indices];
+    number_of_neurons = length(Left_monocular_indices) + length(Right_monocular_indices) ...
+        + length(Left_binocular_indices) + length(Right_binocular_indices);
+    test_regions = {'LM', Left_monocular_indices;'RM', Right_monocular_indices;
+        'LB', Left_binocular_indices; 'RB', Right_binocular_indices};
+end
+
+% I.e. "left eye rightward motion", "right eye upward motion", ...
 input_names = ["LERM", "LEUM", "LELM", "LEDM", "RERM", "REUM", "RELM", "REDM"];
-
-%{
-% USE THESE INDICES FOR SUBDIVIDING LEFT MONO, RIGHT MONO, LEFT BINO, RIGHT BINO
-Left_monocular_indices = [Left_lateral_indices, Left_medial_indices];
-Right_monocular_indices = [Right_lateral_indices, Right_medial_indices];
-Left_binocular_indices = [Left_binocular_indices];
-Right_binocular_indices = [Right_binocular_indices];
-number_of_neurons = length(Left_monocular_indices) + length(Right_monocular_indices) + length(Left_binocular_indices) + length(Right_binocular_indices);
-%}
-
-% Using CURBD in the following mode: out = computeCURBD(RNN, J, regions, params)
 
 correlation_table = [];
 
@@ -48,13 +53,8 @@ for ensemble_index = 1:1
     test_N = data{1, ensemble_index}.N;
     load('curbd_example_workspace.mat');
     
-    % CHOOSE RELEVANT REGIONS AS ABOVE
-    test_regions = {'Monocular', Monocular_indices; 'Binocular', Binocular_indices};
-    %{
-    test_regions = {'LM', Left_monocular_indices;'RM', Right_monocular_indices;
-        'LB', Left_binocular_indices; 'RB', Right_binocular_indices};
-    %}
     test_params = model.params;
+    % Using CURBD in the following mode: out = computeCURBD(RNN, J, regions, params)
     test_CURBD = computeCURBD(test_RNN, test_J, test_regions, test_params);
     % plot heatmaps of currents
     current_figure = figure('Position', [100 100 900 900], 'Visible', 'on');
@@ -135,13 +135,14 @@ for iTarget = 1:size(test_CURBD, 1)
     end
 end
 
-starttime = 1;
-stoptime = size(test_CURBD{1,1}, 2);
+max_stoptime = size(test_CURBD{1,1}, 2);
+starttime = 500;
+stoptime = 1500;
 
 load('inputs.mat');
 
-%stim_plot = 'bin';
-stim_plot = 'all';
+stim_plot = 'bin';
+%stim_plot = 'all';
 %stim_plot = 'off';
 
 current_figure = figure('Position', [100 100 900 900], 'Visible', 'on');
